@@ -1,0 +1,108 @@
+! =====================================================================
+!  VPN IPsec en Packet Tracer
+!  Packet Tracer no emula pfSense ni IKEv2 de acceso remoto, por lo que el
+!  acceso remoto se representa con una VPN sitio a sitio IKEv1 entre:
+!     R-HQ     (WAN 203.0.113.10)  red protegida 10.10.20.0/24 (INTERNA)
+!     R-REMOTO (WAN 198.51.100.20) red del teletrabajador 192.168.50.0/24
+!  R-ISP simula Internet: Gi0/0 203.0.113.1/24 y Gi0/1 198.51.100.1/24
+!  Requisito: routers 1941/2911 con licencia securityk9 activa:
+!     license boot module c2900 technology-package securityk9  -> write -> reload
+! =====================================================================
+
+! ------------------------------ R-ISP ------------------------------
+enable
+configure terminal
+hostname R-ISP
+interface GigabitEthernet0/0
+ ip address 203.0.113.1 255.255.255.0
+ no shutdown
+interface GigabitEthernet0/1
+ ip address 198.51.100.1 255.255.255.0
+ no shutdown
+end
+
+! ------------------------------ R-HQ -------------------------------
+enable
+configure terminal
+! Trafico interesante: INTERNA <-> red remota
+ip access-list extended VPN-TRAFICO
+ permit ip 10.10.20.0 0.0.0.255 192.168.50.0 0.0.0.255
+exit
+! Fase 1 (ISAKMP)
+crypto isakmp policy 10
+ encryption aes 256
+ hash sha256
+ authentication pre-share
+ group 14
+ lifetime 28800
+exit
+crypto isakmp key VpnLab#2026-PSK address 198.51.100.20
+! Fase 2 (IPsec)
+crypto ipsec transform-set TS-AES256 esp-aes 256 esp-sha256-hmac
+ mode tunnel
+exit
+crypto map VPN-MAP 10 ipsec-isakmp
+ set peer 198.51.100.20
+ set transform-set TS-AES256
+ set pfs group14
+ set security-association lifetime seconds 3600
+ match address VPN-TRAFICO
+exit
+interface GigabitEthernet0/1
+ crypto map VPN-MAP
+exit
+end
+! (La ACL WAN-IN de router-on-a-stick.txt ya permite UDP 500/4500 y ESP;
+!  NAT-PAT ya excluye el trafico 10.10.20.0/24 -> 192.168.50.0/24.)
+! Si Packet Tracer rechaza "hash sha256" o "group 14" en tu version,
+! usa "hash sha" y "group 5" y documentalo como limitacion del simulador.
+
+! ----------------------------- R-REMOTO ----------------------------
+enable
+configure terminal
+hostname R-REMOTO
+interface GigabitEthernet0/0
+ description LAN-teletrabajador
+ ip address 192.168.50.1 255.255.255.0
+ no shutdown
+interface GigabitEthernet0/1
+ description WAN
+ ip address 198.51.100.20 255.255.255.0
+ no shutdown
+exit
+ip route 0.0.0.0 0.0.0.0 198.51.100.1
+ip access-list extended VPN-TRAFICO
+ permit ip 192.168.50.0 0.0.0.255 10.10.20.0 0.0.0.255
+exit
+crypto isakmp policy 10
+ encryption aes 256
+ hash sha256
+ authentication pre-share
+ group 14
+ lifetime 28800
+exit
+crypto isakmp key VpnLab#2026-PSK address 203.0.113.10
+crypto ipsec transform-set TS-AES256 esp-aes 256 esp-sha256-hmac
+ mode tunnel
+exit
+crypto map VPN-MAP 10 ipsec-isakmp
+ set peer 203.0.113.10
+ set transform-set TS-AES256
+ set pfs group14
+ set security-association lifetime seconds 3600
+ match address VPN-TRAFICO
+exit
+interface GigabitEthernet0/1
+ crypto map VPN-MAP
+exit
+end
+write memory
+
+! ---------------------------- Verificacion --------------------------
+! 1. Desde la PC remota (192.168.50.10) hacer ping a una PC interna (10.10.20.100).
+!    El primer ping puede fallar mientras se negocia el tunel.
+! 2. En R-HQ:
+!      show crypto isakmp sa      -> estado QM_IDLE
+!      show crypto ipsec sa       -> #pkts encaps / decaps > 0
+! 3. Ping de la PC remota a la DMZ (10.10.10.20) o a IoT -> NO viaja por el
+!    tunel (no es trafico interesante): minimo privilegio.

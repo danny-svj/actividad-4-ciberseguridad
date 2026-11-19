@@ -1,0 +1,420 @@
+<?xml version="1.0"?>
+<!--
+  Laboratorio de seguridad perimetral - pfSense CE 2.7.x
+  Importar: Diagnostics > Backup & Restore > Restore Backup
+            Restore area: "Firewall Rules" (y repetir con "Aliases" / "NAT" si se separan).
+  Interfaces asumidas (asignarlas antes en Interfaces > Assignments):
+    wan  = em0               203.0.113.10/24
+    opt1 = em1.10  (DMZ)      10.10.10.1/24
+    lan  = em1.20  (INTERNA)  10.10.20.1/24
+    opt2 = em1.30  (IOT)      10.10.30.1/24
+    enc0 = IPsec (pool móvil 10.10.99.0/24)
+  Ajusta IPs/interfaces a tu laboratorio antes de importar.
+-->
+<pfsense>
+  <version>23.3</version>
+
+  <!-- ========================= ALIASES ========================= -->
+  <aliases>
+    <alias>
+      <name>NET_INTERNA</name>
+      <type>network</type>
+      <address>10.10.20.0/24</address>
+      <descr><![CDATA[VLAN 20 - Red interna]]></descr>
+      <detail><![CDATA[VLAN 20]]></detail>
+    </alias>
+    <alias>
+      <name>NET_DMZ</name>
+      <type>network</type>
+      <address>10.10.10.0/24</address>
+      <descr><![CDATA[VLAN 10 - DMZ]]></descr>
+      <detail><![CDATA[VLAN 10]]></detail>
+    </alias>
+    <alias>
+      <name>NET_IOT</name>
+      <type>network</type>
+      <address>10.10.30.0/24</address>
+      <descr><![CDATA[VLAN 30 - IoT]]></descr>
+      <detail><![CDATA[VLAN 30]]></detail>
+    </alias>
+    <alias>
+      <name>NET_VPN</name>
+      <type>network</type>
+      <address>10.10.99.0/24</address>
+      <descr><![CDATA[Pool clientes IPsec]]></descr>
+      <detail><![CDATA[VPN]]></detail>
+    </alias>
+    <alias>
+      <name>RFC1918</name>
+      <type>network</type>
+      <address>10.0.0.0/8 172.16.0.0/12 192.168.0.0/16</address>
+      <descr><![CDATA[Redes privadas]]></descr>
+      <detail><![CDATA[10/8||172.16/12||192.168/16]]></detail>
+    </alias>
+    <alias>
+      <name>DMZ_SERVERS</name>
+      <type>host</type>
+      <address>10.10.10.20 10.10.10.30</address>
+      <descr><![CDATA[DVWA y API]]></descr>
+      <detail><![CDATA[DVWA||API]]></detail>
+    </alias>
+    <alias>
+      <name>DMZ_PORTS</name>
+      <type>port</type>
+      <address>80 443 3000</address>
+      <descr><![CDATA[Servicios publicados]]></descr>
+      <detail><![CDATA[HTTP||HTTPS||API]]></detail>
+    </alias>
+    <alias>
+      <name>IOT_CLOUD</name>
+      <type>host</type>
+      <address>iot.vendor-cloud.example mqtt.vendor-cloud.example</address>
+      <descr><![CDATA[Nube del fabricante IoT (FQDN)]]></descr>
+      <detail><![CDATA[API||MQTT]]></detail>
+    </alias>
+    <alias>
+      <name>IOT_PORTS</name>
+      <type>port</type>
+      <address>443 8883</address>
+      <descr><![CDATA[HTTPS y MQTT sobre TLS]]></descr>
+      <detail><![CDATA[HTTPS||MQTTS]]></detail>
+    </alias>
+    <alias>
+      <name>VPN_ALLOWED_PORTS</name>
+      <type>port</type>
+      <address>22 443 445 3389</address>
+      <descr><![CDATA[Puertos permitidos a teletrabajo]]></descr>
+      <detail><![CDATA[SSH||HTTPS||SMB||RDP]]></detail>
+    </alias>
+    <alias>
+      <name>WEB_PORTS</name>
+      <type>port</type>
+      <address>80 443</address>
+      <descr><![CDATA[Navegacion web]]></descr>
+      <detail><![CDATA[HTTP||HTTPS]]></detail>
+    </alias>
+    <alias>
+      <name>DNS_PORTS</name>
+      <type>port</type>
+      <address>53 853</address>
+      <descr><![CDATA[DNS y DNS-over-TLS]]></descr>
+      <detail><![CDATA[DNS||DoT]]></detail>
+    </alias>
+  </aliases>
+
+  <!-- ========================= NAT (port forward a DMZ) ========================= -->
+  <nat>
+    <rule>
+      <source><any/></source>
+      <destination><network>wanip</network><port>80</port></destination>
+      <protocol>tcp</protocol>
+      <target>10.10.10.20</target>
+      <local-port>80</local-port>
+      <interface>wan</interface>
+      <descr><![CDATA[NAT HTTP -> DVWA]]></descr>
+      <associated-rule-id>pass</associated-rule-id>
+    </rule>
+    <rule>
+      <source><any/></source>
+      <destination><network>wanip</network><port>3000</port></destination>
+      <protocol>tcp</protocol>
+      <target>10.10.10.30</target>
+      <local-port>3000</local-port>
+      <interface>wan</interface>
+      <descr><![CDATA[NAT API -> 10.10.10.30:3000]]></descr>
+      <associated-rule-id>pass</associated-rule-id>
+    </rule>
+  </nat>
+
+  <!-- ========================= REGLAS DE FIREWALL ========================= -->
+  <filter>
+    <!-- == WAN == -->
+    <rule>
+      <tracker>1000000001</tracker>
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source><any/></source>
+      <destination><address>DMZ_SERVERS</address><port>DMZ_PORTS</port></destination>
+      <log/>
+      <descr><![CDATA[R1 WAN: permitir servicios publicados en la DMZ]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000002</tracker>
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>udp</protocol>
+      <source><any/></source>
+      <destination><network>wanip</network><port>500</port></destination>
+      <descr><![CDATA[R2a WAN: IPsec IKE]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000003</tracker>
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>udp</protocol>
+      <source><any/></source>
+      <destination><network>wanip</network><port>4500</port></destination>
+      <descr><![CDATA[R2b WAN: IPsec NAT-T]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000004</tracker>
+      <type>pass</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>esp</protocol>
+      <source><any/></source>
+      <destination><network>wanip</network></destination>
+      <descr><![CDATA[R2c WAN: IPsec ESP]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000005</tracker>
+      <type>block</type>
+      <interface>wan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <source><any/></source>
+      <destination><address>NET_INTERNA</address></destination>
+      <log/>
+      <descr><![CDATA[R3 WAN: bloquear todo trafico externo a la red interna]]></descr>
+    </rule>
+
+    <!-- == DMZ (opt1) == -->
+    <rule>
+      <tracker>1000000010</tracker>
+      <type>pass</type>
+      <interface>opt1</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source><address>10.10.10.30</address></source>
+      <destination><address>10.10.20.50</address><port>3306</port></destination>
+      <log/>
+      <descr><![CDATA[R4 DMZ: solo la API consulta la BD interna]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000011</tracker>
+      <type>block</type>
+      <interface>opt1</interface>
+      <ipprotocol>inet</ipprotocol>
+      <source><network>opt1</network></source>
+      <destination><address>NET_INTERNA</address></destination>
+      <log/>
+      <descr><![CDATA[R5 DMZ: bloquear pivoteo DMZ -> red interna]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000012</tracker>
+      <type>block</type>
+      <interface>opt1</interface>
+      <ipprotocol>inet</ipprotocol>
+      <source><network>opt1</network></source>
+      <destination><address>NET_IOT</address></destination>
+      <log/>
+      <descr><![CDATA[R5b DMZ: bloquear DMZ -> IoT]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000013</tracker>
+      <type>pass</type>
+      <interface>opt1</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp/udp</protocol>
+      <source><network>opt1</network></source>
+      <destination><network>opt1ip</network><port>53</port></destination>
+      <descr><![CDATA[R5c DMZ: DNS solo hacia pfSense]]></descr>
+    </rule>
+
+    <!-- == IoT (opt2) == -->
+    <rule>
+      <tracker>1000000020</tracker>
+      <type>pass</type>
+      <interface>opt2</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp/udp</protocol>
+      <source><network>opt2</network></source>
+      <destination><network>opt2ip</network><port>53</port></destination>
+      <descr><![CDATA[R6a IoT: DNS solo hacia pfSense]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000021</tracker>
+      <type>pass</type>
+      <interface>opt2</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source><network>opt2</network></source>
+      <destination><address>IOT_CLOUD</address><port>IOT_PORTS</port></destination>
+      <log/>
+      <descr><![CDATA[R6 IoT: salida solo a la nube del fabricante]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000022</tracker>
+      <type>block</type>
+      <interface>opt2</interface>
+      <ipprotocol>inet</ipprotocol>
+      <source><network>opt2</network></source>
+      <destination><address>RFC1918</address></destination>
+      <log/>
+      <descr><![CDATA[R7 IoT: aislar de redes privadas (interna y DMZ)]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000023</tracker>
+      <type>block</type>
+      <interface>opt2</interface>
+      <ipprotocol>inet</ipprotocol>
+      <source><network>opt2</network></source>
+      <destination><any/></destination>
+      <log/>
+      <descr><![CDATA[R7b IoT: denegar el resto de la salida]]></descr>
+    </rule>
+
+    <!-- == INTERNA (lan) == -->
+    <rule>
+      <tracker>1000000030</tracker>
+      <type>pass</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp/udp</protocol>
+      <source><network>lan</network></source>
+      <destination><network>lanip</network><port>53</port></destination>
+      <descr><![CDATA[R8 INTERNA: DNS forzado a pfSense (DNSBL antiphishing)]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000031</tracker>
+      <type>block</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp/udp</protocol>
+      <source><network>lan</network></source>
+      <destination><any/><port>DNS_PORTS</port></destination>
+      <log/>
+      <descr><![CDATA[R9 INTERNA: bloquear DNS/DoT externo que evada el filtro]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000032</tracker>
+      <type>block</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <source><network>lan</network></source>
+      <destination><address>NET_IOT</address></destination>
+      <log/>
+      <descr><![CDATA[R9b INTERNA: no iniciar conexiones a IoT]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000033</tracker>
+      <type>pass</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source><network>lan</network></source>
+      <destination><any/><port>WEB_PORTS</port></destination>
+      <descr><![CDATA[R10 INTERNA: navegacion web]]></descr>
+    </rule>
+
+    <!-- == IPsec (enc0) == -->
+    <rule>
+      <tracker>1000000040</tracker>
+      <type>pass</type>
+      <interface>enc0</interface>
+      <ipprotocol>inet</ipprotocol>
+      <protocol>tcp</protocol>
+      <source><address>NET_VPN</address></source>
+      <destination><address>NET_INTERNA</address><port>VPN_ALLOWED_PORTS</port></destination>
+      <log/>
+      <descr><![CDATA[R11 VPN: teletrabajo con minimo privilegio]]></descr>
+    </rule>
+    <rule>
+      <tracker>1000000041</tracker>
+      <type>block</type>
+      <interface>enc0</interface>
+      <ipprotocol>inet</ipprotocol>
+      <source><address>NET_VPN</address></source>
+      <destination><any/></destination>
+      <log/>
+      <descr><![CDATA[R12 VPN: denegar el resto]]></descr>
+    </rule>
+    <!-- R12 global: pfSense deniega implicitamente todo lo no permitido.
+         Habilitar el log en System > Advanced > Firewall & NAT > "Log packets blocked by the default rule". -->
+  </filter>
+
+  <!-- ========================= IPsec móvil (IKEv2) ========================= -->
+  <ipsec>
+    <client>
+      <enable/>
+      <user_source>Local Database</user_source>
+      <group_source>none</group_source>
+      <pool_address>10.10.99.0</pool_address>
+      <pool_netbits>24</pool_netbits>
+      <dns_server1>10.10.20.1</dns_server1>
+    </client>
+    <phase1>
+      <ikeid>1</ikeid>
+      <iketype>ikev2</iketype>
+      <interface>wan</interface>
+      <mobile/>
+      <protocol>inet</protocol>
+      <myid_type>fqdn</myid_type>
+      <myid_data>vpn.lab.example</myid_data>
+      <peerid_type>any</peerid_type>
+      <encryption>
+        <item>
+          <encryption-algorithm><name>aes256gcm</name><keylen>128</keylen></encryption-algorithm>
+          <hash-algorithm>sha256</hash-algorithm>
+          <prf-algorithm>sha256</prf-algorithm>
+          <dhgroup>14</dhgroup>
+        </item>
+      </encryption>
+      <lifetime>28800</lifetime>
+      <authentication_method>eap-mschapv2</authentication_method>
+      <certref>CERT_VPN_SERVER</certref>
+      <dpd_delay>10</dpd_delay>
+      <dpd_maxfail>5</dpd_maxfail>
+      <descr><![CDATA[VPN acceso remoto IKEv2]]></descr>
+    </phase1>
+    <phase2>
+      <ikeid>1</ikeid>
+      <uniqid>vpnp2lab01</uniqid>
+      <mode>tunnel</mode>
+      <localid><type>network</type><address>10.10.20.0</address><netbits>24</netbits></localid>
+      <protocol>esp</protocol>
+      <encryption-algorithm-option><name>aes256gcm</name><keylen>128</keylen></encryption-algorithm-option>
+      <pfsgroup>14</pfsgroup>
+      <lifetime>3600</lifetime>
+      <descr><![CDATA[Acceso a red interna]]></descr>
+    </phase2>
+  </ipsec>
+
+  <!-- ========================= pfBlockerNG DNSBL (lista personalizada) ========================= -->
+  <installedpackages>
+    <pfblockerngdnsblsettings>
+      <config>
+        <pfb_dnsbl>on</pfb_dnsbl>
+        <pfb_dnsvip>10.10.20.254</pfb_dnsvip>
+        <dnsbl_interface>lan</dnsbl_interface>
+      </config>
+    </pfblockerngdnsblsettings>
+    <pfblockerngdnsbl>
+      <config>
+        <aliasname>DNSBL_Phishing_Lab</aliasname>
+        <description><![CDATA[Feeds de phishing + lista de prueba]]></description>
+        <row>
+          <format>auto</format>
+          <state>Enabled</state>
+          <url>https://openphish.com/feed.txt</url>
+          <header>OpenPhish</header>
+        </row>
+        <row>
+          <format>auto</format>
+          <state>Enabled</state>
+          <url>https://urlhaus.abuse.ch/downloads/hostfile/</url>
+          <header>URLhaus</header>
+        </row>
+        <action>unbound</action>
+        <cron>01hour</cron>
+        <custom><![CDATA[paypal-verify-login.example
+secure-bank-update.example
+office365-password-reset.example
+micorsoft-support.example]]></custom>
+      </config>
+    </pfblockerngdnsbl>
+  </installedpackages>
+</pfsense>

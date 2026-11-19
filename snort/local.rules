@@ -1,0 +1,54 @@
+# =====================================================================
+#  Reglas personalizadas Snort 2.9.x - Laboratorio seguridad perimetral
+#  pfSense: Services > Snort > (interfaz) > Rules > Category: custom.rules
+#  SIDs locales: 1000001 - 1000012  (rango >= 1000000 reservado para uso local)
+#
+#  Variables (Services > Snort > interfaz > Variables):
+#    HOME_NET     = [10.10.10.0/24,10.10.20.0/24,10.10.30.0/24,203.0.113.10]
+#    EXTERNAL_NET = !$HOME_NET
+#    DMZ_WEB      = [10.10.10.20,10.10.10.30]
+#  Si DMZ_WEB no existe en tu interfaz, sustituyelo por las IP literales.
+#
+#  Para modo IPS: habilitar "Inline IPS Mode" (netmap) para que las reglas
+#  "drop" descarten paquetes, o "Block Offenders" (legacy) para bloquear la IP.
+# =====================================================================
+
+# ---------- 1. Reconocimiento / escaneo de puertos (nmap) ----------
+
+# nmap -sS : mas de 20 SYN en 5 s desde la misma IP origen
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LAB-SCAN Posible escaneo SYN (nmap -sS)"; flow:stateless; flags:S,12; detection_filter:track by_src, count 20, seconds 5; classtype:attempted-recon; sid:1000001; rev:2;)
+
+# nmap -sN : paquete TCP sin banderas
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LAB-SCAN Escaneo NULL (sin banderas TCP)"; flow:stateless; flags:0; classtype:attempted-recon; sid:1000002; rev:1;)
+
+# nmap -sF : solo FIN sin sesion establecida
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LAB-SCAN Escaneo FIN (nmap -sF)"; flow:stateless; flags:F,12; detection_filter:track by_src, count 5, seconds 10; classtype:attempted-recon; sid:1000003; rev:1;)
+
+# nmap -sX : FIN + PSH + URG
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LAB-SCAN Escaneo XMAS (FIN+PSH+URG)"; flow:stateless; flags:FPU,12; classtype:attempted-recon; sid:1000004; rev:1;)
+
+# nmap -sU : mas de 30 datagramas UDP en 5 s desde la misma IP
+alert udp $EXTERNAL_NET any -> $HOME_NET any (msg:"LAB-SCAN Posible escaneo UDP (nmap -sU)"; detection_filter:track by_src, count 30, seconds 5; classtype:attempted-recon; sid:1000005; rev:1;)
+
+# nmap -sn : barrido ICMP echo (mas de 10 echo-request en 5 s)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"LAB-SCAN Barrido ICMP (ping sweep)"; itype:8; detection_filter:track by_src, count 10, seconds 5; classtype:attempted-recon; sid:1000006; rev:1;)
+
+# nmap -O : sonda IE de deteccion de SO (ICMP echo con code 9)
+alert icmp $EXTERNAL_NET any -> $HOME_NET any (msg:"LAB-SCAN Sonda nmap de deteccion de SO (ICMP code 9)"; itype:8; icode:9; classtype:attempted-recon; sid:1000007; rev:1;)
+
+# IPS: descartar cualquier SYN externo directo a la red interna (no deberia llegar nunca)
+drop tcp $EXTERNAL_NET any -> 10.10.20.0/24 any (msg:"LAB-IPS SYN externo hacia VLAN interna descartado"; flow:stateless; flags:S,12; classtype:policy-violation; sid:1000008; rev:1;)
+
+# nmap -sA : escaneo ACK para mapear reglas de firewall
+alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LAB-SCAN Escaneo ACK (nmap -sA)"; flow:stateless; flags:A,12; ack:0; detection_filter:track by_src, count 10, seconds 5; classtype:attempted-recon; sid:1000009; rev:1;)
+
+# ---------- 2. Ataques a aplicaciones en la DMZ ----------
+
+# Inyeccion SQL tipo UNION SELECT en la URI (DVWA / API)
+alert tcp $EXTERNAL_NET any -> $DMZ_WEB [80,3000] (msg:"LAB-WEB Intento de inyeccion SQL (UNION SELECT)"; flow:to_server,established; content:"union"; http_uri; nocase; pcre:"/union(\s|%20|\+|\/\*.*?\*\/)+select/Ui"; classtype:web-application-attack; sid:1000010; rev:1;)
+
+# XSS: etiqueta <script> en la URI (codificada o no)
+alert tcp $EXTERNAL_NET any -> $DMZ_WEB [80,3000] (msg:"LAB-WEB Intento de XSS (<script> en URI)"; flow:to_server,established; pcre:"/(<|%3C)\s*script/Ui"; classtype:web-application-attack; sid:1000011; rev:1;)
+
+# Tautologia SQL clasica ' OR '1'='1 / OR 1=1
+alert tcp $EXTERNAL_NET any -> $DMZ_WEB [80,3000] (msg:"LAB-WEB Intento de inyeccion SQL (tautologia OR 1=1)"; flow:to_server,established; pcre:"/(%27|')\s*(or|%6F%72)\s*(%27|')?\d+(%27|')?\s*(=|%3D)/Ui"; classtype:web-application-attack; sid:1000012; rev:1;)
