@@ -26,6 +26,10 @@
 | `22-snort-alertas.png` | Alertas de las 7 reglas de escaneo |
 | `23-snort-bloqueo.png` | IP atacante bloqueada; segundo escaneo filtrado |
 | `24-snort-ataques-web.png` | SQLi y XSS detectados por Snort |
+| `25-segmentacion-firewall.png` | 4 redes y reglas del firewall |
+| `26-segmentacion-pruebas.png` | 12/12 pruebas de segmentación correctas |
+| `27-vpn-ipsec-tunel.png` | Túnel IPsec: sin VPN bloqueado, con VPN acceso mínimo |
+| `28-vpn-ipsec-estado.png` | Estado del túnel y contadores de reglas |
 
 ## ⏳ Pendientes (necesitan pfSense, que no corre en Mac con chip M2)
 

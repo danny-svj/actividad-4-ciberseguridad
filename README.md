@@ -108,6 +108,24 @@ Diagrama hecho en draw.io: [`03_red/Diagrama_Red_Segmentada.drawio`](03_red/Diag
 | 30 IoT | 10.10.30.0/24 | Cámaras, sensores | Solo sale a su nube |
 | VPN | 10.10.99.0/24 | Teletrabajo | IPsec IKEv2, AES-256, solo 22/443/445/3389 |
 
+### Prueba funcional de la segmentación y la VPN
+
+Para demostrar que el diseño funciona, se montó la misma red en Docker ([`03_red/laboratorio/`](03_red/laboratorio/)): 4 redes (WAN, DMZ, interna e IoT) con las mismas IP del diagrama, y un firewall en medio con reglas de mínimo privilegio equivalentes a las de pfSense (política por defecto: **DROP**).
+
+![Firewall y redes](capturas/25-segmentacion-firewall.png)
+
+**12 de 12 pruebas** se comportan como se diseñó: lo necesario pasa y todo lo demás se bloquea.
+
+![Pruebas de segmentación](capturas/26-segmentacion-pruebas.png)
+
+**VPN IPsec IKEv2 (strongSwan):** sin túnel, el teletrabajador no entra a la red interna. Con el túnel recibe la IP virtual 10.10.99.1 y solo llega a SSH y RDP; la base de datos sigue bloqueada.
+
+![Túnel VPN](capturas/27-vpn-ipsec-tunel.png)
+
+Estado del túnel en el firewall (AES-256, SHA-256, DH 14) y contadores de las reglas de la VPN:
+
+![Estado VPN](capturas/28-vpn-ipsec-estado.png)
+
 ## Fase 4 · Seguridad perimetral
 
 Configuración en [`04_perimetral/`](04_perimetral/): `pfsense-rules.xml` y `local.rules`.
@@ -164,7 +182,7 @@ Los ataques web desde otro equipo (172.20.0.5) también se detectan con las regl
 ├── capturas/                    # Evidencias (ver capturas/LEEME.md)
 ├── 01_zap/                      # Reporte de OWASP ZAP
 ├── 02_api/                      # API, package.json y colección de Postman
-├── 03_red/                      # Diagrama draw.io (.drawio y .png)
+├── 03_red/                      # Diagrama draw.io + laboratorio de segmentación y VPN
 ├── 04_perimetral/               # Reglas pfSense (.xml) y Snort (.rules)
 └── 05_riesgos/                  # Matriz y tabla de mitigaciones
 ```
