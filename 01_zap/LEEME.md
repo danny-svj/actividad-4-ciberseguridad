@@ -1,11 +1,9 @@
 # Reporte de OWASP ZAP
 
-Guarda aquí el reporte HTML exportado desde ZAP (*Report > Generate Report*), por ejemplo `ZAP-Report-DVWA.html`.
+`ZAP-Report-DVWA.html`: escaneo real de DVWA (nivel Low) con ZAP 2.17.
 
-Pasos del escaneo:
+- Spider: 79 URLs.
+- Active Scan con sesión autenticada (se excluyeron logout, setup y security).
+- Resultado: 28 tipos de alerta — 9 High, 7 Medium, 9 Low, 3 Informational.
 
-1. DVWA Security en **Low** e iniciar sesión desde el navegador que abre ZAP.
-2. Crear un Context "DVWA" (`http://<ip-dvwa>/.*`), excluir `logout.php` y `setup.php`.
-3. Spider + AJAX Spider.
-4. Active Scan con la política por defecto.
-5. Exportar el reporte a esta carpeta.
+Ábrelo descargando el archivo y abriéndolo en el navegador.

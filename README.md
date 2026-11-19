@@ -12,9 +12,13 @@ Análisis de vulnerabilidades web y API, red segmentada y seguridad perimetral c
 
 ## Fase 1 · Vulnerabilidades en DVWA (OWASP ZAP)
 
-DVWA corriendo en Docker (`localhost:4280`) con nivel de seguridad **Low**.
+DVWA corriendo en Docker (`localhost:4280`) con nivel de seguridad **Low**, escaneado con OWASP ZAP 2.17 (Spider + Active Scan con sesión autenticada).
 
 ![DVWA Low](capturas/01-entorno-dvwa-security-low.png)
+
+El escaneo encontró **28 tipos de alerta: 9 altas, 7 medias, 9 bajas y 3 informativas**, entre ellas SQL Injection, XSS (reflejado, persistente y DOM), Path Traversal y Remote File Inclusion. Reporte completo: [`01_zap/ZAP-Report-DVWA.html`](01_zap/ZAP-Report-DVWA.html).
+
+![Resumen ZAP](capturas/09-zap-resumen.png)
 
 | # | Vulnerabilidad | OWASP 2021 | Vector | Impacto | Riesgo |
 | --- | --- | --- | --- | --- | --- |
@@ -32,11 +36,19 @@ DVWA corriendo en Docker (`localhost:4280`) con nivel de seguridad **Low**.
 
 ![SQLi UNION](capturas/04-sqli-union-select.png)
 
+ZAP la confirma como riesgo **High** manipulando el parámetro `id` con condiciones booleanas:
+
+![Alerta SQLi ZAP](capturas/05-sqli-zap-alerta.png)
+
 ### V2 · XSS reflejado
 
 El parámetro `name` refleja el script sin filtrar; el JavaScript inyectado se ejecuta y lee la cookie de sesión:
 
 ![XSS](capturas/06-xss-ejecutado.png)
+
+Alerta **High** de ZAP para XSS reflejado:
+
+![Alerta XSS ZAP](capturas/07-xss-zap-alerta.png)
 
 ### V3 · Control de acceso roto
 
