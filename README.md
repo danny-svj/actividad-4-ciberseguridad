@@ -2,10 +2,9 @@
 
 | Campo | Valor |
 | --- | --- |
-| Alumno | _[tu nombre]_ |
-| Matrícula | _[tu matrícula]_ |
+| Alumno | Daniel Alejandro González Salazar |
+| Matrícula | AL07076433 |
 | Materia | Ciberseguridad |
-| Docente | _[nombre del docente]_ |
 | Fecha | 18 de noviembre de 2026 |
 
 Análisis de vulnerabilidades web y API, red segmentada y seguridad perimetral con pfSense + Snort, en 5 fases. El documento completo está en [`Documento de la Actividad/`](Documento%20de%20la%20Actividad/Actividad4_Ciberseguridad.pdf).
