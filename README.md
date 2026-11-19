@@ -39,6 +39,17 @@ ZAP la confirma como riesgo **High** manipulando el parámetro `id` con condicio
 
 ![Alerta SQLi ZAP](capturas/05-sqli-zap-alerta.png)
 
+### Extra · File Inclusion (Path Traversal)
+
+Con `?page=../../../../../../etc/passwd` el servidor devuelve el archivo de cuentas del sistema:
+
+![File Inclusion](capturas/02-file-inclusion-etc-passwd.png)
+
+ZAP también lo detectó como **Path Traversal** y **Remote File Inclusion** (riesgo High):
+
+![ZAP Path Traversal](capturas/13-zap-path-traversal.png)
+![ZAP RFI](capturas/13b-zap-rfi.png)
+
 ### V2 · XSS reflejado
 
 El parámetro `name` refleja el script sin filtrar; el JavaScript inyectado se ejecuta y lee la cookie de sesión:
@@ -109,7 +120,35 @@ Configuración en [`04_perimetral/`](04_perimetral/): `pfsense-rules.xml` y `loc
 alert tcp $EXTERNAL_NET any -> $HOME_NET any (msg:"LAB-SCAN Posible escaneo SYN (nmap -sS)"; flow:stateless; flags:S,12; detection_filter:track by_src, count 20, seconds 5; classtype:attempted-recon; sid:1000001; rev:2;)
 ```
 
-> ⏳ Capturas pendientes de esta fase (pfSense, Snort y nmap): ver [`capturas/LEEME.md`](capturas/LEEME.md).
+### Laboratorio del IDS/IPS
+
+Snort 2.9.15 corre en Docker escuchando la red del servidor DVWA, con **las mismas reglas de [`local.rules`](04_perimetral/local.rules)**. Un contenedor atacante con nmap simula el ataque. Cuando Snort detecta un escaneo, un script bloquea la IP de origen con iptables, igual que *Block Offenders* de pfSense.
+
+![Contenedores del laboratorio](capturas/16-laboratorio-docker.png)
+
+Reglas personalizadas cargadas y configuración validada (la regla `drop` 1000008 solo aplica en modo IPS inline):
+
+![Reglas Snort](capturas/20-snort-reglas.png)
+
+### Simulación del ataque con nmap
+
+Antes del bloqueo, el atacante (172.20.0.4) ve el puerto 80 abierto:
+
+![nmap antes](capturas/21-nmap-escaneo.png)
+
+Snort generó alertas de **las 7 reglas de escaneo** (SYN, NULL, FIN, XMAS, UDP, ICMP y detección de SO):
+
+![Alertas Snort](capturas/22-snort-alertas.png)
+
+**Respuesta IPS:** la IP atacante queda bloqueada y el segundo escaneo ya ve **todos los puertos filtrados**:
+
+![IP bloqueada](capturas/23-snort-bloqueo.png)
+
+Los ataques web desde otro equipo (172.20.0.5) también se detectan con las reglas 1000010–1000012:
+
+![Ataques web detectados](capturas/24-snort-ataques-web.png)
+
+> ⏳ Pendiente: capturas de la interfaz de pfSense (reglas, DNSBL y VPN). pfSense solo existe para procesadores x86 y no corre en VirtualBox sobre Mac con chip M2. Las reglas ya están listas en [`pfsense-rules.xml`](04_perimetral/pfsense-rules.xml).
 
 ## Fase 5 · Evaluación de riesgos
 
