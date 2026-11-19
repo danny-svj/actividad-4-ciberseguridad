@@ -128,7 +128,11 @@ Estado del túnel en el firewall (AES-256, SHA-256, DH 14) y contadores de las r
 
 ## Fase 4 · Seguridad perimetral
 
-Configuración en [`04_perimetral/`](04_perimetral/): `pfsense-rules.xml` y `local.rules`.
+Archivos en [`04_perimetral/`](04_perimetral/):
+
+- [`config-pfSense.lab.local-20261118.xml`](04_perimetral/config-pfSense.lab.local-20261118.xml): **exportación real** de pfSense (Diagnostics → Backup & Restore).
+- [`pfsense-diseno-3vlan.xml`](04_perimetral/pfsense-diseno-3vlan.xml): reglas del diseño completo con 3 VLAN y VPN.
+- [`local.rules`](04_perimetral/local.rules): reglas personalizadas de Snort.
 
 - **pfSense:** denegar por defecto, bloqueo total hacia la red interna, DNS forzado.
 - **Filtrado de phishing:** pfBlockerNG DNSBL (OpenPhish + URLhaus).
@@ -166,7 +170,35 @@ Los ataques web desde otro equipo (172.20.0.5) también se detectan con las regl
 
 ![Ataques web detectados](capturas/24-snort-ataques-web.png)
 
-> ⏳ Pendiente: capturas de la interfaz de pfSense (reglas, DNSBL y VPN). pfSense solo existe para procesadores x86 y no corre en VirtualBox sobre Mac con chip M2. Las reglas ya están listas en [`pfsense-rules.xml`](04_perimetral/pfsense-rules.xml).
+### pfSense 2.7.2 funcionando
+
+pfSense CE 2.7.2 (imagen oficial de Netgate, verificada con SHA-256) instalado en una máquina virtual QEMU que emula un procesador x86 en la Mac M2. Tiene dos interfaces: WAN (10.0.2.15) y LAN (192.168.1.1).
+
+![Dashboard pfSense](capturas/17-pfsense-dashboard.png)
+
+**Reglas de firewall (6 reglas propias):**
+
+| # | Interfaz | Acción | Qué hace |
+| --- | --- | --- | --- |
+| R1 | WAN | Block | Bloquear IPs no autorizadas (alias `IP_NO_AUTORIZADAS`) |
+| R2 | WAN | Block | Bloquear tráfico no autorizado a la red interna (alias `NET_INTERNA`) |
+| R3 | LAN | Pass | DNS solo hacia pfSense (para que aplique el filtro antiphishing) |
+| R4 | LAN | Block | Bloquear DNS externo (evita saltarse el filtro) |
+| R5 | LAN | Block | Bloquear servidores de phishing (alias `PHISHING_IPS`) |
+| R6 | LAN | Pass | Permitir solo navegación web (80/443) |
+
+![Reglas WAN](capturas/18-pfsense-reglas-wan.png)
+![Reglas LAN](capturas/18b-pfsense-reglas-lan.png)
+![Aliases](capturas/18c-pfsense-aliases.png)
+
+**Prueba del firewall:** se lanzaron conexiones desde fuera (IP 10.0.2.2, incluida en `IP_NO_AUTORIZADAS`) a los puertos 22, 80 y 3389. El log de pfSense muestra que la regla **R1** las bloqueó todas:
+
+![Log de bloqueos](capturas/29-pfsense-log-bloqueos.png)
+
+**Filtrado de contenido con pfBlockerNG:** grupo DNSBL `Phishing_Lab` con dominios de phishing. Al consultar `paypal-verify-login.example`, pfSense responde con la IP de bloqueo **10.10.10.1** en lugar de la real:
+
+![Grupo DNSBL](capturas/19-pfsense-dnsbl-grupo.png)
+![Dominio bloqueado](capturas/19b-pfsense-dnsbl-bloqueo.png)
 
 ## Fase 5 · Evaluación de riesgos
 

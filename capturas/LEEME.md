@@ -30,11 +30,12 @@
 | `26-segmentacion-pruebas.png` | 12/12 pruebas de segmentación correctas |
 | `27-vpn-ipsec-tunel.png` | Túnel IPsec: sin VPN bloqueado, con VPN acceso mínimo |
 | `28-vpn-ipsec-estado.png` | Estado del túnel y contadores de reglas |
+| `17-pfsense-dashboard.png` | pfSense 2.7.2 funcionando (WAN y LAN) |
+| `18-pfsense-reglas-wan.png` | Reglas R1 y R2 en la WAN |
+| `18b-pfsense-reglas-lan.png` | Reglas R3–R6 en la LAN |
+| `18c-pfsense-aliases.png` | Aliases usados por las reglas |
+| `19-pfsense-dnsbl-grupo.png` | Grupo DNSBL de phishing en pfBlockerNG |
+| `19b-pfsense-dnsbl-bloqueo.png` | Dominio de phishing resuelto a la IP de bloqueo |
+| `29-pfsense-log-bloqueos.png` | Log del firewall: R1 bloqueando conexiones |
 
-## ⏳ Pendientes (necesitan pfSense, que no corre en Mac con chip M2)
-
-| Archivo | Qué debe verse |
-| --- | --- |
-| `17-pfsense-vpn-ipsec.png` | VPN > IPsec > Status con el túnel |
-| `18-pfsense-reglas.png` | Firewall > Rules |
-| `19-pfsense-dnsbl.png` | pfBlockerNG bloqueando un dominio de phishing |
+Todas las capturas son de ejecuciones reales en esta Mac (Docker y QEMU).
